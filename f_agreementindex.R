@@ -35,7 +35,7 @@ f_agreementindex <- function(m, type = c("group","vote","group_vote")){
   if (type == "group"){
     output_ai <- df_ai %>% 
       group_by(epgroup) %>% 
-      summarise(Ai = mean(Ai)) %>% 
+      summarise(Ai = mean(Ai, na.rm = TRUE)) %>% 
       pivot_wider(names_from = epgroup, values_from = Ai) %>% 
       clean_names()
   }

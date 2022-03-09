@@ -241,33 +241,6 @@ server <- function(input, output, session) {
     
     ##### MAJORITY VALUE BOXES
     
-    # output$epp_majority <- renderValueBox({
-    #     majority <- group_majorities() %>% filter(epgroup == "EPP") %>% pull(majority)
-    #     if(majority == "for"){
-    #         value <- "in favour"
-    #         icon <- icon("thumbs-up")
-    #         color <- "green"
-    #     } else {
-    #         if(majority == "against"){
-    #             value <- "against"
-    #             icon <- icon("thumbs-down")
-    #             color <- "red"
-    #         } else {
-    #             if(majority == "abstention"){
-    #                 value <- "abstained"
-    #                 icon <- icon("minus")
-    #                 color <- "aqua"
-    #             } else {
-    #                 value <- "draw"
-    #                 icon <- icon("tilde")
-    #                 color <- "yellow"
-    #             }
-    #         }
-    #     }
-    #     valueBox(value = value, icon = icon, color = color,
-    #              subtitle = paste0("party", " majority"))
-    # })
-    
     valueboxattr_epp <- reactive({f_majorities_valuebox(group_majorities(), "EPP")})
     valueboxattr_sd <- reactive({f_majorities_valuebox(group_majorities(), "S&D")})
     valueboxattr_ecr <- reactive({f_majorities_valuebox(group_majorities(), "ECR")})
