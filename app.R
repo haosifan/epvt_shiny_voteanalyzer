@@ -76,7 +76,7 @@ body <- dashboardBody(
         tabItem(tabName = "singlevote",
                 h2("Single vote statistics"),
                 fluidRow(
-                    selectInput(inputId = "vote_selector_stats", 
+                    pickerInput(inputId = "vote_selector_stats", 
                                 label = NULL, 
                                 choices = NULL,
                                 width = "100%"),
@@ -257,7 +257,7 @@ server <- function(input, output, session) {
             pull(output)
 
         # Can also set the label and select items
-        updateSelectInput(session, "vote_selector_stats",
+        updatePickerInput(session, "vote_selector_stats",
                           choices = x,
                           selected = NULL
         )
@@ -401,24 +401,24 @@ server <- function(input, output, session) {
 
 ##### PAGE 4 - MEPs #####################
     
-
-    mep_infos_update <- reactive({
-        r <- mep_infos %>% 
+    mep_infos_update <- reactiveValues()
+    
+    observe({
+        mep_infos_update$data <- mep_infos %>% 
             arrange(lastname) %>% 
             filter(country %in% input$country_select) %>% 
             filter(eugroup %in% input$group_select) %>% 
             mutate(html = paste("<span style='font-size: 80%; color: grey'>",firstname,"</span>"," ",
                                "<span style='font-size: 100%;'>",lastname,"</span>"))
-        return(r)
         })
     
     observe({
         updatePickerInput(
             session,
             "mep_select",
-            choices = mep_infos_update()$voteid,
+            choices = mep_infos_update$data$voteid,
             choicesOpt = list(
-                content = mep_infos_update()$html))})
+                content = mep_infos_update$data$html))})
         
     
     observe({output$test1 <- renderText(input$mep_select)})
