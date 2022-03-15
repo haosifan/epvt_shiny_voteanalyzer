@@ -204,6 +204,12 @@ server <- function(input, output, session) {
     output_mepvotes_df <- reactiveValues()
     
     observeEvent(input$submit_votes, {
+        shinyalert(title = "Data is prepared.",
+                   text = "This might take a while. You will see another notification when finished.",
+                   type = "info",
+                   timer = 5*1000, 
+                   showConfirmButton = FALSE)
+        
         voteids_selected <- output_votes_df() %>% 
             rownames_to_column("rowid") %>% 
             mutate(rowid = as.numeric(rowid)) %>% 
@@ -225,6 +231,7 @@ server <- function(input, output, session) {
             arrange(lastname)
         
         output_mepvotes_df$data <- votes_mep_downloaded
+        shinyalert(title = "Check!", text = "Data is ready.", type = "success")
     })
     
 ### Table Outputs (Search and select) ####
