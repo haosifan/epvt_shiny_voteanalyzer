@@ -1,6 +1,8 @@
 ## app.R ##
 library(shiny)
 library(shinydashboard)
+library(shinyWidgets)
+library(shinyalert)
 library(readr)
 library(dplyr)
 library(tibble)
@@ -9,11 +11,14 @@ library(tidyr)
 library(janitor)
 library(DT)
 library(ggplot2)
+library(lubridate)
+library(labelled)
 
 source("f_agreementindex.R") 
 source("f_groupmajorities.R")
 source("f_majorities_valueboxes.R")
 source("f_groupvotecohesion.R")
+source("f_mepoverview_ftable.R")
 
 
 
@@ -28,7 +33,8 @@ item_rollcall <- read_csv("https://raw.githubusercontent.com/TechToThePeople/mep
 rollcall_descriptions <- left_join(item_rollcall, descriptions, by = c("report" = "reference")) %>% 
     select(identifier:report, desc = `title.x`, title = `title.y`, everything(), -desc)
 
-mep_infos <- read_csv("https://raw.githubusercontent.com/TechToThePeople/mepwatch/production/9/data/meps.csv")
+mep_infos <- read_csv("https://raw.githubusercontent.com/TechToThePeople/mepwatch/production/9/data/meps.csv") %>% 
+    arrange(lastname)
 
 #################
 ###### UI #######
@@ -58,6 +64,7 @@ body <- dashboardBody(
                     DT::dataTableOutput("files") 
                 ),
                 hr(),
+                h4("Second, select specific votes within the files you want to inspect"),
                 #checkboxInput("finalvotes", "Select only final votes", value = FALSE, width = NULL),
                 fluidRow(
                     DT::dataTableOutput("votes")
@@ -67,7 +74,23 @@ body <- dashboardBody(
         ),
         
         tabItem(tabName = "singlevote",
-                h2("Analyse votes")
+                h2("Single vote statistics"),
+                fluidRow(
+                    selectInput(inputId = "vote_selector_stats", 
+                                label = NULL, 
+                                choices = NULL,
+                                width = "100%"),
+                ),
+                fluidRow(
+                    valueBoxOutput("epp_majority",width = 3),
+                    valueBoxOutput("sd_majority",width = 3),
+                    valueBoxOutput("ecr_majority",width = 3),
+                    valueBoxOutput("greens_majority",width = 3),
+                    valueBoxOutput("id_majority",width = 3),
+                    valueBoxOutput("left_majority",width = 3),
+                    valueBoxOutput("renew_majority",width = 3),
+                    valueBoxOutput("ni_majority",width = 3)
+                )
         ),
         tabItem(tabName = "multvotes",
                 h2("Statistics"),
@@ -83,31 +106,39 @@ body <- dashboardBody(
                     valueBoxOutput("ni_cohesion")
                 ),
                 fluidRow(
-                    plotOutput("cohesion_density")  
-                ),
-                h3("Single vote statistics"),
+                    plotOutput("cohesion_density")
+                )
+                
+        ),
+        tabItem(tabName = "MEPs",
+                h2("MEPs statistics"),
                 fluidRow(
-                    selectInput(inputId = "vote_selector_stats", 
-                                label = NULL, 
-                                choices = NULL,
-                                width = "100%"),
-                    textOutput("test2"),
-                    dataTableOutput("test")
+                    box(
+                        pickerInput("country_select", label = "Filter MEPs by country", 
+                                    choices = unique(mep_infos$country), multiple = TRUE,
+                                    selected = unique(mep_infos$country),
+                                    options = list(`actions-box` = TRUE))),
+                    box(
+                        pickerInput("group_select", label = "Filter MEPs by group affiliation",
+                                    choices = unique(mep_infos$eugroup), multiple = TRUE,
+                                    selected = unique(mep_infos$eugroup), 
+                                    options = list(`actions-box` = TRUE)))
+                ),
+                fluidRow(
+                    box(width = 12,
+                    pickerInput("mep_select", label = "Select one ore more MEPs", 
+                                choices = NULL, multiple = TRUE,
+                                options = list(`actions-box` = TRUE,
+                                               `live-search` = TRUE)),
+                    textOutput("test1"),
                     ),
                 fluidRow(
-                    valueBoxOutput("epp_majority"),
-                    valueBoxOutput("sd_majority"),
-                    valueBoxOutput("ecr_majority"),
-                    valueBoxOutput("greens_majority"),
-                    valueBoxOutput("id_majority"),
-                    valueBoxOutput("left_majority"),
-                    valueBoxOutput("renew_majority"),
-                    valueBoxOutput("ni_majority")
+                    box(width = 12,
+                        dataTableOutput("mep_stats")
+                        )
+                )
                 )
                 ),
-        tabItem(tabName = "meps",
-                h2("Analyse MEPs")
-        ),
         tabItem(tabName = "download",
                 h2("Download Section"),
                 fluidRow(
@@ -351,6 +382,65 @@ server <- function(input, output, session) {
 
 ##### PAGE 3 - MULTIPLE VOTES STATS #####  
 
+##### PAGE 4 - MEPs #####################
+    
+
+    mep_infos_update <- reactive({
+        r <- mep_infos %>% 
+            arrange(lastname) %>% 
+            filter(country %in% input$country_select) %>% 
+            filter(eugroup %in% input$group_select) %>% 
+            mutate(html = paste("<span style='font-size: 80%; color: grey'>",firstname,"</span>"," ",
+                               "<span style='font-size: 100%;'>",lastname,"</span>"," ", flag("de")))
+        return(r)
+        })
+    
+    observe({
+        updatePickerInput(
+            session,
+            "mep_select",
+            choices = mep_infos_update()$voteid,
+            choicesOpt = list(
+                content = mep_infos_update()$html))})
+        
+    
+    observe({output$test1 <- renderText(input$mep_select)})
+    
+    mep_table <- reactive({
+        if (!is.null(input$mep_select)){
+            data <- output_mepvotes_df() %>%
+                filter(mepid %in% input$mep_select) %>%
+                filter(country %in% input$country_select) %>% 
+                filter(epgroup %in% input$group_select) %>% 
+                arrange(lastname)
+        } else {
+            data <- output_mepvotes_df() %>%
+                filter(country %in% input$country_select) %>% 
+                filter(epgroup %in% input$group_select) %>% 
+                arrange(lastname)
+        }
+        
+        output_mep_table <- data %>% 
+            group_by(mepid, lastname, firstname, country, epgroup, party) %>%
+            mutate(result = factor(result, levels = c("for","against","abstention"))) %>% 
+            dplyr::count(result, .drop = FALSE) %>% 
+            pivot_wider(names_from = result, values_from = n, values_fill = 0) %>% 
+            mutate(Ai = ((max(`for`,against,abstention)-(0.5*((`for`+against+abstention)-max(`for`+against+abstention))))/(`for`+against+abstention))) %>% 
+            arrange(lastname)
+              
+        return(output_mep_table)
+    })
+    
+    # mep_table_overview <- eventReactive(input$mep_select, {
+    #     
+    #     data <- output_mepvotes_df() %>% filter(mepid %in% input$mep_select) %>% arrange(lastname)
+    #     output_mep_table <- f_make_mep_table(data)
+    #     
+    #     return(output_mep_table)
+    # })
+    
+    output$mep_stats <- renderDataTable({mep_table() %>% mutate(Ai = round(Ai*100,2))})
+    #output$test2 <- renderDataTable({mep_table_overview()})
 }
 
 shinyApp(ui, server)
