@@ -201,7 +201,9 @@ server <- function(input, output, session) {
     
     ## Retrieve file IDs and download
     
-    output_mepvotes_df <- eventReactive(input$submit_votes, {
+    output_mepvotes_df <- reactiveValues()
+    
+    observeEvent(input$submit_votes, {
         voteids_selected <- output_votes_df() %>% 
             rownames_to_column("rowid") %>% 
             mutate(rowid = as.numeric(rowid)) %>% 
@@ -222,14 +224,14 @@ server <- function(input, output, session) {
                    start:country, term, -oeil) %>% 
             arrange(lastname)
         
-        return(votes_mep_downloaded)
+        output_mepvotes_df$data <- votes_mep_downloaded
     })
     
 ### Table Outputs (Search and select) ####
     
     output$files <- DT::renderDataTable(output_files_df(), server = TRUE)
     output$votes <- DT::renderDataTable(output_votes_df(), server = TRUE)
-    output$mepvotes <- DT::renderDataTable(output_mepvotes_df(), 
+    output$mepvotes <- DT::renderDataTable(output_mepvotes_df$data, 
                                            server = TRUE, 
                                            options = list(scrollX = TRUE))
     
@@ -255,17 +257,17 @@ server <- function(input, output, session) {
     
     
     group_cohesion <- eventReactive(input$submit_votes, {
-        output_mepvotes_df() %>% f_agreementindex("group")
+        output_mepvotes_df$data %>% f_agreementindex("group")
         })
     group_majorities <- reactive({
-        output_mepvotes_df() %>% 
+        output_mepvotes_df$data %>% 
             f_groupmajorities() %>% 
             left_join(output_votes_df(), by = c("title" = "title", "desc" = "desc")) %>% 
             mutate(selection = paste(title, desc, sep = " - ")) %>% 
             filter(selection == input$vote_selector_stats)
         })
     groupvote_cohesion <- eventReactive(input$submit_votes, {
-        output_mepvotes_df() %>% f_agreementindex("group_vote")
+        output_mepvotes_df$data %>% f_agreementindex("group_vote")
         })
     
     ####
@@ -408,13 +410,13 @@ server <- function(input, output, session) {
     
     mep_table <- reactive({
         if (!is.null(input$mep_select)){
-            data <- output_mepvotes_df() %>%
+            data <- output_mepvotes_df$data %>%
                 filter(mepid %in% input$mep_select) %>%
                 filter(country %in% input$country_select) %>% 
                 filter(epgroup %in% input$group_select) %>% 
                 arrange(lastname)
         } else {
-            data <- output_mepvotes_df() %>%
+            data <- output_mepvotes_df$data %>%
                 filter(country %in% input$country_select) %>% 
                 filter(epgroup %in% input$group_select) %>% 
                 arrange(lastname)
@@ -433,7 +435,7 @@ server <- function(input, output, session) {
     
     # mep_table_overview <- eventReactive(input$mep_select, {
     #     
-    #     data <- output_mepvotes_df() %>% filter(mepid %in% input$mep_select) %>% arrange(lastname)
+    #     data <- output_mepvotes_df$data %>% filter(mepid %in% input$mep_select) %>% arrange(lastname)
     #     output_mep_table <- f_make_mep_table(data)
     #     
     #     return(output_mep_table)
