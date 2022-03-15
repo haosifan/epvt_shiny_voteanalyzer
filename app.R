@@ -82,6 +82,9 @@ body <- dashboardBody(
                                 width = "100%"),
                 ),
                 fluidRow(
+                    plotOutput("plot_result_single_vote")
+                ),
+                fluidRow(
                     valueBoxOutput("epp_majority",width = 3),
                     valueBoxOutput("sd_majority",width = 3),
                     valueBoxOutput("ecr_majority",width = 3),
@@ -96,14 +99,14 @@ body <- dashboardBody(
                 h2("Statistics"),
                 h3("Dataset Statistics (All selected votes)"),
                 fluidRow(
-                    valueBoxOutput("epp_cohesion"),
-                    valueBoxOutput("sd_cohesion"),
-                    valueBoxOutput("greens_cohesion"),
-                    valueBoxOutput("re_cohesion"),
-                    valueBoxOutput("ecr_cohesion"),
-                    valueBoxOutput("id_cohesion"),
-                    valueBoxOutput("left_cohesion"),
-                    valueBoxOutput("ni_cohesion")
+                    valueBoxOutput("epp_cohesion", width = 1),
+                    valueBoxOutput("sd_cohesion", width = 1),
+                    valueBoxOutput("greens_cohesion", width = 1),
+                    valueBoxOutput("re_cohesion", width = 1),
+                    valueBoxOutput("ecr_cohesion", width = 1),
+                    valueBoxOutput("id_cohesion", width = 1),
+                    valueBoxOutput("left_cohesion", width = 1),
+                    valueBoxOutput("ni_cohesion", width = 1)
                 ),
                 fluidRow(
                     plotOutput("cohesion_density")
@@ -169,34 +172,34 @@ server <- function(input, output, session) {
     
     ## Output of Files
     
-    output_files_df <- reactive({
+    output_files_df <- reactiveValues()
+    
+    observe({
         startdate <- format(input$daterange_files[1])
         enddate <- format(input$daterange_files[2])
         
-        output_files <- rollcall_descriptions %>% 
+        output_files_df$data <- rollcall_descriptions %>% 
             filter(date >= startdate, date <= enddate) %>% 
             arrange(desc(date)) %>% 
             select(report, title) %>% 
             distinct()
-        
-        return(output_files)
     })
     
     ## Output of Votes
     
-    output_votes_df <- reactive({
-        fileids_selected <- output_files_df() %>% 
+    output_votes_df <- reactiveValues()
+    
+    observe({
+        fileids_selected <- output_files_df$data %>% 
             rownames_to_column("rowid") %>% 
             mutate(rowid = as.numeric(rowid)) %>% 
             filter(rowid %in% input$files_rows_selected) %>% 
             pull(report)
         
-        output_votes <- rollcall_descriptions %>% 
+        output_votes_df$data <- rollcall_descriptions %>% 
             select(report, date, title, desc, `for`, against, abstention, committee) %>% 
             filter(report %in% fileids_selected) %>% 
             arrange(desc(date))
-        
-        return(output_votes)
     })
     
     ## Retrieve file IDs and download
@@ -204,13 +207,13 @@ server <- function(input, output, session) {
     output_mepvotes_df <- reactiveValues()
     
     observeEvent(input$submit_votes, {
-        shinyalert(title = "Data is prepared.",
+        shinyalert(title = "Data being prepared.",
                    text = "This might take a while. You will see another notification when finished.",
                    type = "info",
                    timer = 5*1000, 
                    showConfirmButton = FALSE)
         
-        voteids_selected <- output_votes_df() %>% 
+        voteids_selected <- output_votes_df$data %>% 
             rownames_to_column("rowid") %>% 
             mutate(rowid = as.numeric(rowid)) %>% 
             filter(rowid %in% input$votes_rows_selected) %>% 
@@ -236,8 +239,8 @@ server <- function(input, output, session) {
     
 ### Table Outputs (Search and select) ####
     
-    output$files <- DT::renderDataTable(output_files_df(), server = TRUE)
-    output$votes <- DT::renderDataTable(output_votes_df(), server = TRUE)
+    output$files <- DT::renderDataTable(output_files_df$data, server = TRUE)
+    output$votes <- DT::renderDataTable(output_votes_df$data, server = TRUE)
     output$mepvotes <- DT::renderDataTable(output_mepvotes_df$data, 
                                            server = TRUE, 
                                            options = list(scrollX = TRUE))
@@ -246,7 +249,7 @@ server <- function(input, output, session) {
     
 ##### PAGE 3 - MULTIPLE VOTES STATS #####   
     choices_vote_stats <-  observeEvent(input$submit_votes, {
-        x <- output_votes_df() %>% 
+        x <- output_votes_df$data %>% 
             rownames_to_column("rowid") %>% 
             mutate(rowid = as.numeric(rowid)) %>% 
             filter(rowid %in% input$votes_rows_selected) %>% 
@@ -269,7 +272,7 @@ server <- function(input, output, session) {
     group_majorities <- reactive({
         output_mepvotes_df$data %>% 
             f_groupmajorities() %>% 
-            left_join(output_votes_df(), by = c("title" = "title", "desc" = "desc")) %>% 
+            left_join(output_votes_df$data, by = c("title" = "title", "desc" = "desc")) %>% 
             mutate(selection = paste(title, desc, sep = " - ")) %>% 
             filter(selection == input$vote_selector_stats)
         })
@@ -278,6 +281,11 @@ server <- function(input, output, session) {
         })
     
     ####
+    
+    #### Graph Result Single Vote
+    
+    
+    
     
     ##### MAJORITY VALUE BOXES
     
@@ -400,7 +408,7 @@ server <- function(input, output, session) {
             filter(country %in% input$country_select) %>% 
             filter(eugroup %in% input$group_select) %>% 
             mutate(html = paste("<span style='font-size: 80%; color: grey'>",firstname,"</span>"," ",
-                               "<span style='font-size: 100%;'>",lastname,"</span>"," ", flag("de")))
+                               "<span style='font-size: 100%;'>",lastname,"</span>"))
         return(r)
         })
     
