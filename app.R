@@ -13,12 +13,20 @@ library(DT)
 library(ggplot2)
 library(lubridate)
 library(labelled)
+library(plotly)
+library(flextable)
+library(ggforce)
+library(scales)
+library(stringr)
 
 source("f_agreementindex.R") 
 source("f_groupmajorities.R")
 source("f_majorities_valueboxes.R")
 source("f_groupvotecohesion.R")
 source("f_mepoverview_ftable.R")
+source("f_plot_groupresults.R")
+source("f_makeresultdonut.R")
+source("f_majorityformedby.R")
 
 
 
@@ -82,7 +90,23 @@ body <- dashboardBody(
                                 width = "100%"),
                 ),
                 fluidRow(
-                    plotOutput("plot_result_single_vote")
+                    column(4,
+                           valueBoxOutput("result_date", width = 12),
+                           valueBoxOutput("result_report", width = 12),
+                           valueBoxOutput("result_committee", width = 12)
+                    ),
+                    column(4,
+                           valueBoxOutput("result_for", width = 12),
+                           valueBoxOutput("result_against", width = 12),
+                           valueBoxOutput("result_abstention", width = 12)
+                           ),
+                    column(4, plotOutput("donut"))
+                ),
+                fluidRow(
+                    plotlyOutput("plot_result_single_vote"),
+                    h3("Majority formed by: "),
+                    uiOutput("majority_formed_by"),
+                    hr()
                 ),
                 fluidRow(
                     valueBoxOutput("epp_majority",width = 3),
@@ -137,7 +161,10 @@ body <- dashboardBody(
                     ),
                 fluidRow(
                     box(width = 12,
-                        dataTableOutput("mep_stats")
+                        #dataTableOutput("test2"),
+                        dataTableOutput("mep_stats"),
+                        uiOutput("mep_overview")
+                        #dataTableOutput("data_mep")
                         )
                 )
                 )
@@ -246,10 +273,11 @@ server <- function(input, output, session) {
                                            options = list(scrollX = TRUE))
     
 ##### END OF PAGE1 - SEARCH AND SELECT #####
+
+##### PAGE 2 - SINGLE VOTE STATS ########
     
-##### PAGE 3 - MULTIPLE VOTES STATS #####   
-    choices_vote_stats <-  observeEvent(input$submit_votes, {
-        x <- output_votes_df$data %>% 
+    observeEvent(input$submit_votes, {
+        choices <- output_votes_df$data %>% 
             rownames_to_column("rowid") %>% 
             mutate(rowid = as.numeric(rowid)) %>% 
             filter(rowid %in% input$votes_rows_selected) %>% 
@@ -258,7 +286,7 @@ server <- function(input, output, session) {
 
         # Can also set the label and select items
         updatePickerInput(session, "vote_selector_stats",
-                          choices = x,
+                          choices = choices,
                           selected = NULL
         )
     })
@@ -269,6 +297,7 @@ server <- function(input, output, session) {
     group_cohesion <- eventReactive(input$submit_votes, {
         output_mepvotes_df$data %>% f_agreementindex("group")
         })
+    
     group_majorities <- reactive({
         output_mepvotes_df$data %>% 
             f_groupmajorities() %>% 
@@ -276,15 +305,95 @@ server <- function(input, output, session) {
             mutate(selection = paste(title, desc, sep = " - ")) %>% 
             filter(selection == input$vote_selector_stats)
         })
+    
     groupvote_cohesion <- eventReactive(input$submit_votes, {
         output_mepvotes_df$data %>% f_agreementindex("group_vote")
         })
     
-    ####
+    singlevote_data <- reactive({
+        singlevote <- output_mepvotes_df$data %>% 
+            mutate(selection = paste(title, desc, sep = " - ")) %>% 
+            filter(selection == input$vote_selector_stats)
+        return(singlevote)
+    })
     
-    #### Graph Result Single Vote
     
     
+    
+    #### Extract results
+    
+    voteinfo <- reactiveValues()
+    observeEvent(input$vote_selector_stats, {
+        selected_vote <- singlevote_data() %>%
+            select(date:committee) %>%
+            mutate(date = ymd_hms(date)) %>% 
+            distinct()
+        
+        voteinfo$date <- selected_vote$date
+        voteinfo$report <- selected_vote$report
+        voteinfo$rfor <- selected_vote$`for`
+        voteinfo$ragainst <- selected_vote$against
+        voteinfo$rabstention <- selected_vote$abstention
+        voteinfo$committee <- selected_vote$committee
+        
+        voteinfo$donut <- f_makeresultdonut(selected_vote)
+        
+        voteinfo$majorityformedby <- f_majorityformedby(singlevote_data()) %>% 
+            pull(majority_formed_by) %>% 
+            str_replace_all(pattern = ",", replacement = "") %>% 
+            str_replace(pattern = "EPP", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/EPP_EP_group_logo_2015.svg/1024px-EPP_EP_group_logo_2015.svg.png" height="50"/>') %>% 
+            str_replace(pattern = "S&D", replacement = '<img src="https://www.socialistsanddemocrats.eu/sites/default/files/styles/large/public/2019-11/logo_white_solo.png?itok=e7BDUZ1M" height="50"/>') %>% 
+            str_replace(pattern = "ECR", replacement = '<img src="https://ecrgroup.eu/photos/MAIN_LOGO_ENGLISH.png" height="50"/>') %>% 
+            str_replace(pattern = "LEFT", replacement = '<img src="https://europa.blog/wp-content/uploads/2021/02/The-Left-rund_400x400.jpg" height="50"/>') %>% 
+            str_replace(pattern = "Greens/EFA", replacement = '<img src="https://yt3.ggpht.com/ytc/AKedOLRsCh3D-EDf9AGBloxjRAaFONPaaTSufIzGmIFE=s900-c-k-c0x00ffffff-no-rj" height="50"/>') %>% 
+            str_replace(pattern = "ID", replacement = '<img src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9e/Identity_and_democracy_logo.png/200px-Identity_and_democracy_logo.png" height="50"/>') %>% 
+            str_replace(pattern = "NI", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Grey_Square.svg/480px-Grey_Square.svg.png" height="50"/>') %>% 
+            str_replace(pattern = "Renew", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Logo_of_Renew_Europe.svg/2000px-Logo_of_Renew_Europe.svg.png" height="50"/>')
+            
+        })
+    
+    output$donut <- renderPlot({voteinfo$donut}, bg="transparent")
+    
+    output$result_report <- renderValueBox({
+        valueBox(paste(voteinfo$report),
+                 subtitle = "report identifier", color = "navy")
+    })
+    
+    output$result_date <- renderValueBox({
+        valueBox(paste(as.character(voteinfo$date)),
+                 subtitle = "", color = "navy")
+    })
+    
+    output$result_committee <- renderValueBox({
+        valueBox(paste0(voteinfo$committee),
+                 subtitle = "responsible committee", color = "navy")
+    })
+    
+    output$result_for <- renderValueBox({
+        valueBox(paste(voteinfo$rfor),
+                 subtitle = "votes in favour", color = "green")
+    })
+    
+    output$result_against <- renderValueBox({
+        valueBox(paste(voteinfo$ragainst),
+                 subtitle = "votes against", color = "red")
+    })
+    
+    output$result_abstention <- renderValueBox({
+        valueBox(paste(voteinfo$rabstention),
+                 subtitle = "votes abstained", color = "aqua")
+    })
+    
+    #### Majority formed by
+    
+    output$majority_formed_by <- renderUI({HTML(voteinfo$majorityformedby)})
+    
+    
+    #### Graph EPGroups Result Single Vote
+    
+    output$test3 <- renderDataTable({singlevote_data()})
+    
+    output$plot_result_single_vote <- renderPlotly(f_plot_groupresults(singlevote_data()))
     
     
     ##### MAJORITY VALUE BOXES
@@ -340,16 +449,15 @@ server <- function(input, output, session) {
 
     #### END MAJORITY VALUE BOXES
     
+    ##### PAGE 3 - MULTIPLE VOTES STATS #####  
+    
     #### DENSITY PLOT ####
     
     output$cohesion_density <- renderPlot({f_plot_cohesion_density(groupvote_cohesion())},height = 400)
     
     #### END DENSITY PLOT ####
     
-    
-        
-    # output$test <- renderDataTable({group_majorities()}, options = list(scrollX = TRUE))
-    # output$test2 <- renderText({valueboxattr_epp()$value})
+
 
     
     ####### Cohesion Value Boxes
@@ -448,16 +556,16 @@ server <- function(input, output, session) {
         return(output_mep_table)
     })
     
-    # mep_table_overview <- eventReactive(input$mep_select, {
-    #     
-    #     data <- output_mepvotes_df$data %>% filter(mepid %in% input$mep_select) %>% arrange(lastname)
-    #     output_mep_table <- f_make_mep_table(data)
-    #     
-    #     return(output_mep_table)
-    # })
+     mep_table_overview <- eventReactive(input$mep_select, {
+         
+         data <- output_mepvotes_df$data %>% filter(mepid %in% input$mep_select) %>% arrange(lastname)
+         output_mep_overview <- data %>% f_make_mep_table(descriptions = rollcall_descriptions)
+         
+         return(output_mep_overview)
+     })
     
     output$mep_stats <- renderDataTable({mep_table() %>% mutate(Ai = round(Ai*100,2))})
-    #output$test2 <- renderDataTable({mep_table_overview()})
+    output$mep_overview <- renderUI({mep_table_overview() %>% htmltools_value()})
 }
 
 shinyApp(ui, server)
