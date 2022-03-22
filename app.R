@@ -258,6 +258,7 @@ server <- function(input, output, session) {
                    mepid, lastname, firstname, result, 
                    epgroup = `eugroup.x`, party, 
                    start:country, term, -oeil) %>% 
+            mutate(epgroup = replace_na(epgroup, "NI")) %>% 
             arrange(lastname)
         
         output_mepvotes_df$data <- votes_mep_downloaded
