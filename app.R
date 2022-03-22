@@ -50,6 +50,7 @@ mep_infos <- read_csv("https://raw.githubusercontent.com/TechToThePeople/mepwatc
 
 sidebar <- dashboardSidebar(
     sidebarMenu(
+        id = "tabs",
         menuItem("Search and Select", tabName = "search", icon = icon("search")),
         menuItem("Inspect single vote stats", tabName = "singlevote", icon = icon("vote-yea"), badgeColor = "green"),
         menuItem("Inspect overall stats", tabName = "multvotes", icon = icon("poll-h"), badgeColor = "green"),
@@ -133,7 +134,8 @@ body <- dashboardBody(
                     valueBoxOutput("ni_cohesion", width = 1)
                 ),
                 fluidRow(
-                    plotOutput("cohesion_density")
+                    plotOutput("cohesion_density"),
+                    dataTableOutput("test")
                 )
                 
         ),
@@ -262,7 +264,8 @@ server <- function(input, output, session) {
             arrange(lastname)
         
         output_mepvotes_df$data <- votes_mep_downloaded
-        shinyalert(title = "Check!", text = "Data is ready.", type = "success")
+        shinyalert(title = "Check!", text = "Data is ready.", type = "success", 
+                   closeOnEsc = FALSE, closeOnClickOutside = FALSE, showCancelButton = FALSE)
     })
     
 ### Table Outputs (Search and select) ####
@@ -292,7 +295,7 @@ server <- function(input, output, session) {
         )
     })
     
-    #### Update data based on selection ####
+    ###### Update data based on selection ######
     
     
     group_cohesion <- eventReactive(input$submit_votes, {
@@ -321,7 +324,7 @@ server <- function(input, output, session) {
     
     
     
-    #### Extract results
+    ###### Extract results ######
     
     voteinfo <- reactiveValues()
     observeEvent(input$vote_selector_stats, {
@@ -348,7 +351,7 @@ server <- function(input, output, session) {
             str_replace(pattern = "LEFT", replacement = '<img src="https://europa.blog/wp-content/uploads/2021/02/The-Left-rund_400x400.jpg" height="50"/>') %>% 
             str_replace(pattern = "Greens/EFA", replacement = '<img src="https://yt3.ggpht.com/ytc/AKedOLRsCh3D-EDf9AGBloxjRAaFONPaaTSufIzGmIFE=s900-c-k-c0x00ffffff-no-rj" height="50"/>') %>% 
             str_replace(pattern = "ID", replacement = '<img src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9e/Identity_and_democracy_logo.png/200px-Identity_and_democracy_logo.png" height="50"/>') %>% 
-            str_replace(pattern = "NI", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Grey_Square.svg/480px-Grey_Square.svg.png" height="50"/>') %>% 
+            str_replace(pattern = "NI", replacement = '<img src="https://raw.githubusercontent.com/haosifan/epvt_shiny_voteanalyzer/main/NI.png" height="50"/>') %>% 
             str_replace(pattern = "Renew", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Logo_of_Renew_Europe.svg/2000px-Logo_of_Renew_Europe.svg.png" height="50"/>')
             
         })
@@ -385,19 +388,19 @@ server <- function(input, output, session) {
                  subtitle = "votes abstained", color = "aqua")
     })
     
-    #### Majority formed by
+    ###### Majority formed by ######
     
     output$majority_formed_by <- renderUI({HTML(voteinfo$majorityformedby)})
     
     
-    #### Graph EPGroups Result Single Vote
+    ###### Graph EPGroups Result Single Vote ######
     
     output$test3 <- renderDataTable({singlevote_data()})
     
     output$plot_result_single_vote <- renderPlotly(f_plot_groupresults(singlevote_data()))
     
     
-    ##### MAJORITY VALUE BOXES
+    ###### MAJORITY VALUE BOXES #######
     
     valueboxattr_epp <- reactive({f_majorities_valuebox(group_majorities(), "EPP")})
     valueboxattr_sd <- reactive({f_majorities_valuebox(group_majorities(), "S&D")})
@@ -450,18 +453,24 @@ server <- function(input, output, session) {
 
     #### END MAJORITY VALUE BOXES
     
-    ##### PAGE 3 - MULTIPLE VOTES STATS #####  
+    ##### PAGE 3 - MULTIPLE VOTES STATS ##### 
     
-    #### DENSITY PLOT ####
+    ###### Top3 majorities ######
+    
+    observeEvent(input$submit_votes, {
+        top_majorities <- f_majorityformedby(output_mepvotes_df$data) %>% 
+            group_by(majority_formed_by) %>% 
+            count()
+        output$test <- renderDataTable({top_majorities})
+    })
+    
+    
+    ###### Density Plot ######
     
     output$cohesion_density <- renderPlot({f_plot_cohesion_density(groupvote_cohesion())},height = 400)
-    
-    #### END DENSITY PLOT ####
-    
-
 
     
-    ####### Cohesion Value Boxes
+    ###### Cohesion Value Boxes #####
     
     output$epp_cohesion <- renderValueBox({
         valueBox(paste0(round(group_cohesion()$epp*100,0),"%"),
@@ -505,8 +514,6 @@ server <- function(input, output, session) {
     
     ## END COHESION VALUE BOXES
     
-
-##### PAGE 3 - MULTIPLE VOTES STATS #####  
 
 ##### PAGE 4 - MEPs #####################
     
