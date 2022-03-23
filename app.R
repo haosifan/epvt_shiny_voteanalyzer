@@ -134,8 +134,10 @@ body <- dashboardBody(
                     valueBoxOutput("ni_cohesion", width = 1)
                 ),
                 fluidRow(
-                    plotOutput("cohesion_density"),
-                    dataTableOutput("test")
+                    column(6,
+                           dataTableOutput("top_majorities")),
+                    column(6,
+                           plotOutput("n_majorities"))
                 )
                 
         ),
@@ -455,13 +457,32 @@ server <- function(input, output, session) {
     
     ##### PAGE 3 - MULTIPLE VOTES STATS ##### 
     
-    ###### Top3 majorities ######
+    ###### Top3 majorities and Number Groups are part of the majority ######
     
     observeEvent(input$submit_votes, {
-        top_majorities <- f_majorityformedby(output_mepvotes_df$data) %>% 
-            group_by(majority_formed_by) %>% 
-            count()
-        output$test <- renderDataTable({top_majorities})
+        top_majorities <- f_majorityformedby(output_mepvotes_df$data) %>%
+            group_by(majority_formed_by) %>%
+            count() %>%
+            arrange(-n) %>%
+            head(3)
+        
+        part_of_majority <- f_majorityformedby(output_mepvotes_df$data) %>% 
+            separate(majority_formed_by, into = c("x1","x2","x3","x4","x5","x6","x7","x8"), sep = ", ") %>% 
+            pivot_longer(x1:x8) %>% 
+            ungroup() %>% 
+            filter(!is.na(value)) %>% 
+            count(value) %>% 
+            mutate(ep_group = factor(value, levels = c("LEFT","Greens/EFA","S&D","Renew","EPP","ECR","ID","NI"))) %>% 
+            arrange(ep_group) %>% 
+            select(ep_group, n) %>% 
+            ggplot()+
+            aes(x = ep_group, y = n)+
+            geom_col(fill = "#003194")+
+            labs(x = NULL, y = "# group is part of majority")+
+            theme_minimal(base_size = 18)
+        
+        output$top_majorities <- renderDataTable({top_majorities})
+        output$n_majorities <- renderPlot({part_of_majority})
     })
     
     

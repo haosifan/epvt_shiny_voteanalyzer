@@ -20,3 +20,4 @@ f_majorityformedby <- function(data){
   return(majority_formed_by)
 }
 
+
