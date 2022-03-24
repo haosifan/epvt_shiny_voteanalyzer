@@ -349,7 +349,7 @@ server <- function(input, output, session) {
             str_replace_all(pattern = ",", replacement = "") %>% 
             str_replace(pattern = "EPP", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/EPP_EP_group_logo_2015.svg/1024px-EPP_EP_group_logo_2015.svg.png" height="50"/>') %>% 
             str_replace(pattern = "S&D", replacement = '<img src="https://www.socialistsanddemocrats.eu/sites/default/files/styles/large/public/2019-11/logo_white_solo.png?itok=e7BDUZ1M" height="50"/>') %>% 
-            str_replace(pattern = "ECR", replacement = '<img src="https://ecrgroup.eu/photos/MAIN_LOGO_ENGLISH.png" height="50"/>') %>% 
+            str_replace(pattern = "ECR", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/5/55/ECR_Group_logo.png?20200219214944" height="50"/>') %>% 
             str_replace(pattern = "LEFT", replacement = '<img src="https://europa.blog/wp-content/uploads/2021/02/The-Left-rund_400x400.jpg" height="50"/>') %>% 
             str_replace(pattern = "Greens/EFA", replacement = '<img src="https://yt3.ggpht.com/ytc/AKedOLRsCh3D-EDf9AGBloxjRAaFONPaaTSufIzGmIFE=s900-c-k-c0x00ffffff-no-rj" height="50"/>') %>% 
             str_replace(pattern = "ID", replacement = '<img src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9e/Identity_and_democracy_logo.png/200px-Identity_and_democracy_logo.png" height="50"/>') %>% 
@@ -464,7 +464,17 @@ server <- function(input, output, session) {
             group_by(majority_formed_by) %>%
             count() %>%
             arrange(-n) %>%
-            head(3)
+            ungroup() %>% 
+            slice_max(n, n = 3) %>% 
+            mutate(majority_formed_by = str_replace(majority_formed_by, pattern = "EPP", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/EPP_EP_group_logo_2015.svg/1024px-EPP_EP_group_logo_2015.svg.png" height="30"/>'),
+                   majority_formed_by = str_replace(majority_formed_by, pattern = "S&D", replacement = '<img src="https://www.socialistsanddemocrats.eu/sites/default/files/styles/large/public/2019-11/logo_white_solo.png?itok=e7BDUZ1M" height="30"/>'),
+                   majority_formed_by = str_replace(majority_formed_by, pattern = "ECR", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/5/55/ECR_Group_logo.png?20200219214944" height="30"/>'),
+                   majority_formed_by = str_replace(majority_formed_by, pattern = "LEFT", replacement = '<img src="https://europa.blog/wp-content/uploads/2021/02/The-Left-rund_400x400.jpg" height="30"/>'),
+                   majority_formed_by = str_replace(majority_formed_by, pattern = "Greens/EFA", replacement = '<img src="https://yt3.ggpht.com/ytc/AKedOLRsCh3D-EDf9AGBloxjRAaFONPaaTSufIzGmIFE=s900-c-k-c0x00ffffff-no-rj" height="30"/>'),
+                   majority_formed_by = str_replace(majority_formed_by, pattern = "ID", replacement = '<img src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9e/Identity_and_democracy_logo.png/200px-Identity_and_democracy_logo.png" height="30"/>'),
+                   majority_formed_by = str_replace(majority_formed_by, pattern = "Renew", replacement = '<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Logo_of_Renew_Europe.svg/2000px-Logo_of_Renew_Europe.svg.png" height="30"/>'),
+                   majority_formed_by = str_replace(majority_formed_by, pattern = "NI", replacement = '<img src="https://raw.githubusercontent.com/haosifan/epvt_shiny_voteanalyzer/main/NI.png" height="30"/>'),
+                   majority_formed_by = str_replace_all(majority_formed_by, pattern = ",", replacement = ""))
         
         part_of_majority <- f_majorityformedby(output_mepvotes_df$data) %>% 
             separate(majority_formed_by, into = c("x1","x2","x3","x4","x5","x6","x7","x8"), sep = ", ") %>% 
@@ -478,10 +488,14 @@ server <- function(input, output, session) {
             ggplot()+
             aes(x = ep_group, y = n)+
             geom_col(fill = "#003194")+
+            geom_text(aes(label = n), vjust = -0.5)+
             labs(x = NULL, y = "# group is part of majority")+
             theme_minimal(base_size = 18)
         
-        output$top_majorities <- renderDataTable({top_majorities})
+        output$top_majorities <- renderDataTable({
+            top_majorities %>% 
+                DT::datatable(escape = FALSE) 
+            })
         output$n_majorities <- renderPlot({part_of_majority})
     })
     

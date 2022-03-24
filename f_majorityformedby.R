@@ -13,11 +13,12 @@ f_majorityformedby <- function(data){
     left_join(data %>% f_groupmajorities(), by = c("title" = "title", "desc" = "desc")) %>% 
     mutate(epgroup = replace_na(epgroup, "NI"),
            epgroup = case_when(epgroup == "GUE/NGL" ~ "LEFT",
-                               epgroup != "GUE/NGL" ~ epgroup)) %>% 
+                               epgroup != "GUE/NGL" ~ epgroup),
+           epgroup = factor(epgroup, levels = c("LEFT","Greens/EFA","S&D","Renew","EPP","ECR","ID","NI"))) %>% 
     filter(majority == vote_result) %>% 
     group_by(identifier_vote, date, report, desc, title, `for`, against, abstention, data, vote_result) %>% 
+    arrange(epgroup) %>% 
     summarise(majority_formed_by = str_c(epgroup, collapse = ", "))
   return(majority_formed_by)
 }
-
 
