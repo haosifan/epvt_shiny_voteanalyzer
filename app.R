@@ -18,6 +18,7 @@ library(flextable)
 library(ggforce)
 library(scales)
 library(stringr)
+library(forcats)
 
 source("f_agreementindex.R") 
 source("f_groupmajorities.R")
@@ -44,6 +45,17 @@ rollcall_descriptions <- left_join(item_rollcall, descriptions, by = c("report" 
 mep_infos <- read_csv("https://raw.githubusercontent.com/TechToThePeople/mepwatch/production/9/data/meps.csv") %>% 
     arrange(lastname)
 
+committees <- descriptions$committee %>% 
+    replace_na(replace = "no committee") %>% 
+    unique() %>% 
+    sort() %>% 
+    as_factor() %>% 
+    fct_relevel("Special Committee on Beating Cancer", after = Inf) %>% 
+    fct_relevel("Special Committee on Foreign Interference in all Democratic Processes in the European Union, including Disinformation", after = Inf) %>% 
+    fct_relevel("no committee", after = Inf) %>% 
+    sort() %>% 
+    as.character()
+
 #################
 ###### UI #######
 #################
@@ -55,12 +67,8 @@ sidebar <- dashboardSidebar(
         menuItem("Inspect single vote stats", tabName = "singlevote", icon = icon("vote-yea"), badgeColor = "green"),
         menuItem("Inspect overall stats", tabName = "multvotes", icon = icon("poll-h"), badgeColor = "green"),
         menuItem("MEPs", tabName = "MEPs", icon = icon("users"), badgeColor = "blue"),
-        menuItem("Download", tabName = "download", icon = icon("download"), badgeColor = "red"),
-        dateRangeInput("daterange_files", "Date range:",
-                       start = "2019-07-01",
-                       end   = NULL,
-                       weekstart = 1),
-        fileInput("votes_input", "Upload Data", accept = ".csv")
+        menuItem("Download", tabName = "download", icon = icon("download"), badgeColor = "red")#,
+        #fileInput("votes_input", "Upload Data", accept = ".csv")
     )
 )
 
@@ -69,6 +77,25 @@ body <- dashboardBody(
         tabItem(tabName = "search",
                 h2("Search and select"),
                 h4("First, select all files you want to inspect"),
+                fluidRow(
+                    column(6,
+                           dateRangeInput("daterange_files", "Date range:",
+                                          start = "2019-07-01",
+                                          end   = NULL,
+                                          weekstart = 1),
+                           materialSwitch(inputId = "final_votes", label = "Show only final votes in votes section", status = "primary"),
+                           materialSwitch(inputId = "activate_committee", label = "Choose specific committees", status = "primary"),
+                           ),
+                    column(6,
+                           checkboxGroupButtons(
+                               inputId = "committee_select", label = "Choose one ore more committees", 
+                               choices = committees, 
+                               selected = committees,
+                               justified = FALSE, status = "primary",
+                               checkIcon = list(yes = icon("ok", lib = "glyphicon"), no = icon("remove", lib = "glyphicon")),
+                               disabled = TRUE
+                           ))
+                ),
                 fluidRow(
                     DT::dataTableOutput("files") 
                 ),
@@ -121,25 +148,34 @@ body <- dashboardBody(
                 )
         ),
         tabItem(tabName = "multvotes",
-                h2("Statistics"),
-                h3("Dataset Statistics (All selected votes)"),
-                fluidRow(
-                    valueBoxOutput("epp_cohesion", width = 1),
-                    valueBoxOutput("sd_cohesion", width = 1),
-                    valueBoxOutput("greens_cohesion", width = 1),
-                    valueBoxOutput("re_cohesion", width = 1),
-                    valueBoxOutput("ecr_cohesion", width = 1),
-                    valueBoxOutput("id_cohesion", width = 1),
-                    valueBoxOutput("left_cohesion", width = 1),
-                    valueBoxOutput("ni_cohesion", width = 1)
-                ),
+                h2("Statistics for all votes in selected data"),
+                h3("Summary of majorities"),
                 fluidRow(
                     column(6,
+                           h4("Top Majorities"),
+                           p("The majorities that are most frequently found in the data set are displayed. The top 3 are displayed, but in some cases more than three are displayed in the case of ties."),
                            dataTableOutput("top_majorities")),
                     column(6,
+                           h4("Number EP Groups involved in majorities"),
+                           p("In this plot you can find the overview of how often the EP groups were involved in majorities."),
                            plotOutput("n_majorities"))
-                )
-                
+                ),
+                h3("Cohesion Statistics"),
+                fluidRow(
+                    column(6,
+                            valueBoxOutput("left_cohesion", width = 3),
+                            valueBoxOutput("greens_cohesion", width = 3),
+                            valueBoxOutput("sd_cohesion", width = 3),
+                            valueBoxOutput("epp_cohesion", width = 3),
+                            valueBoxOutput("re_cohesion", width = 3),
+                            valueBoxOutput("ecr_cohesion", width = 3),
+                            valueBoxOutput("id_cohesion", width = 3),
+                            valueBoxOutput("ni_cohesion", width = 3)
+                            ),
+                    column(6,
+                           plotOutput("cohesion_density")
+                           )
+                ),
         ),
         tabItem(tabName = "MEPs",
                 h2("MEPs statistics"),
@@ -201,6 +237,13 @@ server <- function(input, output, session) {
         read_csv(infile$datapath)
     })
     
+    observeEvent(input$activate_committee, {
+        
+        if (input$activate_committee == TRUE) {
+            updateCheckboxGroupButtons(session, inputId = "committee_select", disabled = FALSE, selected = "")}
+        else {updateCheckboxGroupButtons(session, inputId = "committee_select", disabled = TRUE, selected = committees)}
+        })
+    
     ## Output of Files
     
     output_files_df <- reactiveValues()
@@ -211,9 +254,11 @@ server <- function(input, output, session) {
         
         output_files_df$data <- rollcall_descriptions %>% 
             filter(date >= startdate, date <= enddate) %>% 
+            filter(committee %in% input$committee_select) %>% 
             arrange(desc(date)) %>% 
             select(report, title) %>% 
             distinct()
+        
     })
     
     ## Output of Votes
@@ -227,10 +272,30 @@ server <- function(input, output, session) {
             filter(rowid %in% input$files_rows_selected) %>% 
             pull(report)
         
-        output_votes_df$data <- rollcall_descriptions %>% 
+        output_votes_prepared <- rollcall_descriptions %>% 
             select(report, date, title, desc, `for`, against, abstention, committee) %>% 
             filter(report %in% fileids_selected) %>% 
             arrange(desc(date))
+        
+        ## filter for final votes / or latest vote
+        ### filter for keywords
+        
+        final_votes_keys <- c("Projet du Conseil", 
+                              "[Ee]nsemble du texte", 
+                              "Proposition de l[ae] Commission", 
+                              "Proposition de décision", 
+                              #"Accord provisoire",
+                              "Proposition de résolution",
+                              "Vote unique",
+                              "Vote final") %>% 
+            paste(collapse = "|")
+        
+        if (input$final_votes){
+            output_votes_df$data <- output_votes_prepared %>% 
+                group_by(report) %>% 
+                filter(str_detect(desc, pattern = final_votes_keys) | str_detect(report, "\\(COD\\)$|\\(BUD\\)$"))
+        } else {output_votes_df$data <- output_votes_prepared}
+        
     })
     
     ## Retrieve file IDs and download
@@ -402,7 +467,7 @@ server <- function(input, output, session) {
     output$plot_result_single_vote <- renderPlotly(f_plot_groupresults(singlevote_data()))
     
     
-    ###### MAJORITY VALUE BOXES #######
+    ###### Value Boxes Group Majority #######
     
     valueboxattr_epp <- reactive({f_majorities_valuebox(group_majorities(), "EPP")})
     valueboxattr_sd <- reactive({f_majorities_valuebox(group_majorities(), "S&D")})
@@ -494,7 +559,9 @@ server <- function(input, output, session) {
         
         output$top_majorities <- renderDataTable({
             top_majorities %>% 
-                DT::datatable(escape = FALSE) 
+                rename(`Majority formed by` = majority_formed_by, Count = n) %>% 
+                DT::datatable(escape = FALSE, options = list(searching = FALSE,
+                                                             lengthChange = FALSE)) 
             })
         output$n_majorities <- renderPlot({part_of_majority})
     })
@@ -509,42 +576,42 @@ server <- function(input, output, session) {
     
     output$epp_cohesion <- renderValueBox({
         valueBox(paste0(round(group_cohesion()$epp*100,0),"%"),
-                 subtitle = "EPP Cohesion", color = "light-blue", width = "12%")
+                 subtitle = "EPP", color = "light-blue", width = "12%")
     })
 
     output$sd_cohesion <- renderValueBox({
         valueBox(paste0(round(group_cohesion()$s_d*100,0),"%"),
-                 subtitle = "S&D Cohesion", color = "red", width = "12%")
+                 subtitle = "S&D", color = "red", width = "12%")
     })
 
     output$greens_cohesion <- renderValueBox({
         valueBox(paste0(round(group_cohesion()$greens_efa*100,0),"%"),
-                 subtitle = "Greens/EFA Cohesion", color = "green", width = "12%")
+                 subtitle = "Greens/EFA", color = "green", width = "12%")
     })
 
     output$re_cohesion <- renderValueBox({
         valueBox(paste0(round(group_cohesion()$renew*100,0),"%"),
-                 subtitle = "RENEW Cohesion", color = "yellow", width = "12%")
+                 subtitle = "RENEW", color = "yellow", width = "12%")
     })
 
     output$ecr_cohesion <- renderValueBox({
         valueBox(paste0(round(group_cohesion()$ecr*100,0),"%"),
-                 subtitle = "ECR Cohesion", color = "blue", width = "12%")
+                 subtitle = "ECR", color = "blue", width = "12%")
     })
 
     output$id_cohesion <- renderValueBox({
         valueBox(paste0(round(group_cohesion()$id*100,0),"%"),
-                 subtitle = "ID Cohesion", color = "navy", width = "12%")
+                 subtitle = "ID", color = "navy", width = "12%")
     })
 
     output$left_cohesion <- renderValueBox({
         valueBox(paste0(round(group_cohesion()$gue_ngl*100,0),"%"),
-                 subtitle = "LEFT Cohesion", color = "purple", width = "12%")
+                 subtitle = "LEFT", color = "purple", width = "12%")
     })
 
     output$ni_cohesion <- renderValueBox({
-        valueBox(paste0(round(group_cohesion()$na*100,0),"%"),
-                 subtitle = "NI Cohesion", color = "black", width = "12%")
+        valueBox(paste0(round(group_cohesion()$ni*100,0),"%"),
+                 subtitle = "NI", color = "black", width = "12%")
     })
     
     ## END COHESION VALUE BOXES
@@ -587,6 +654,8 @@ server <- function(input, output, session) {
                 filter(epgroup %in% input$group_select) %>% 
                 arrange(lastname)
         }
+
+##### MEP stats tables
         
         output_mep_table <- data %>% 
             group_by(mepid, lastname, firstname, country, epgroup, party) %>%
