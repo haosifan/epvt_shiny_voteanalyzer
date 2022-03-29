@@ -176,6 +176,12 @@ body <- dashboardBody(
                            plotOutput("cohesion_density")
                            )
                 ),
+                h3(""),
+                fluidRow(
+                    column(6,
+                           h3("Votes coming from following committees"),
+                           dataTableOutput("committee_count"))
+                )
         ),
         tabItem(tabName = "MEPs",
                 h2("MEPs statistics"),
@@ -476,7 +482,7 @@ server <- function(input, output, session) {
     valueboxattr_id <- reactive({f_majorities_valuebox(group_majorities(), "ID")})
     valueboxattr_greens <- reactive({f_majorities_valuebox(group_majorities(), "Greens/EFA")})
     valueboxattr_renew <- reactive({f_majorities_valuebox(group_majorities(), "Renew")})
-    valueboxattr_ni <- reactive({f_majorities_valuebox(group_majorities(), "")})
+    valueboxattr_ni <- reactive({f_majorities_valuebox(group_majorities(), "NI")})
     
     output$epp_majority <- renderValueBox({valueBox(value = valueboxattr_epp()$value,
                                                     icon = valueboxattr_epp()$icon,
@@ -557,6 +563,15 @@ server <- function(input, output, session) {
             labs(x = NULL, y = "# group is part of majority")+
             theme_minimal(base_size = 18)
         
+        committee_count <- output_mepvotes_df$data %>% 
+            group_by(identifier_vote) %>% 
+            select(identifier_vote, committee) %>% 
+            distinct() %>% 
+            ungroup() %>% 
+            count(committee) %>% 
+            arrange(-n) %>% 
+            rename(`# of votes from committee` = n)
+        
         output$top_majorities <- renderDataTable({
             top_majorities %>% 
                 rename(`Majority formed by` = majority_formed_by, Count = n) %>% 
@@ -564,6 +579,10 @@ server <- function(input, output, session) {
                                                              lengthChange = FALSE)) 
             })
         output$n_majorities <- renderPlot({part_of_majority})
+        
+        output$committee_count <- renderDataTable({committee_count %>%
+                DT::datatable(options = list(searching = FALSE,
+                                             lengthChange = FALSE))})
     })
     
     
