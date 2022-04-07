@@ -163,7 +163,6 @@ body <- dashboardBody(
                 h3("Cohesion Statistics"),
                 fluidRow(
                     column(6,
-                            valueBoxOutput("left_cohesion", width = 3),
                             valueBoxOutput("greens_cohesion", width = 3),
                             valueBoxOutput("sd_cohesion", width = 3),
                             valueBoxOutput("epp_cohesion", width = 3),
