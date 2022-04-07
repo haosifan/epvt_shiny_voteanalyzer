@@ -290,7 +290,7 @@ server <- function(input, output, session) {
                               "Proposition de l[ae] Commission", 
                               "Proposition de décision", 
                               #"Accord provisoire",
-                              "Proposition de résolution",
+                              #"Proposition de résolution",
                               "Vote unique",
                               "Vote final") %>% 
             paste(collapse = "|")
