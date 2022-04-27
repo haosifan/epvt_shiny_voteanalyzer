@@ -217,8 +217,51 @@ body <- dashboardBody(
         tabItem(tabName = "download",
                 h2("Download Section"),
                 fluidRow(
-                    DT::dataTableOutput("mepvotes")
+                    column(2,
+                           downloadButton("download_full_data", label = "Download full dataset")
+                           ),
+                    column(10,
+                           DT::dataTableOutput("mepvotes"))
                 ),
+                fluidRow(
+                    column(2,
+                           downloadButton("download_mep_overview", label = "Download MEP overview")
+                           ),
+                    column(10,
+                           DT::dataTableOutput("mepvotes")
+                    )
+                ),
+                fluidRow(
+                    column(2,
+                           downloadButton("download_mep_summary", label = "Download MEP summary")),
+                    column(10,
+                           DT::dataTableOutput("mepvotes"))
+                ),
+                fluidRow(
+                    column(2,
+                           downloadButton("download_density_plot", label = "Download density plot")),
+                    column(10,
+                           DT::dataTableOutput("mepvotes"))
+                ),
+                fluidRow(
+                    column(2,
+                           downloadButton("download_x", label = "Download density plot")),
+                    column(10,
+                           DT::dataTableOutput("mepvotes"))
+                ),
+                fluidRow(
+                    column(2,
+                           downloadButton("download_y", label = "Download density plot")),
+                    column(10,
+                           DT::dataTableOutput("mepvotes"))
+                ),
+                fluidRow(
+                    column(2,
+                           downloadButton("download_z", label = "Download density plot")),
+                    column(10,
+                           DT::dataTableOutput("mepvotes"))
+                )
+                
     )
     )
 )
