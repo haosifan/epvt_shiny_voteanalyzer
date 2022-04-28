@@ -222,47 +222,29 @@ body <- dashboardBody(
                            ),
                     column(10,
                            DT::dataTableOutput("mepvotes"))
-                ),
-                fluidRow(
-                    column(2,
-                           downloadButton("download_mep_overview", label = "Download MEP overview")
-                           ),
-                    column(10,
-                           DT::dataTableOutput("mepvotes")
-                    )
-                ),
-                fluidRow(
-                    column(2,
-                           downloadButton("download_mep_summary", label = "Download MEP summary")),
-                    column(10,
-                           DT::dataTableOutput("mepvotes"))
-                ),
-                fluidRow(
-                    column(2,
-                           downloadButton("download_density_plot", label = "Download density plot")),
-                    column(10,
-                           DT::dataTableOutput("mepvotes"))
-                ),
-                fluidRow(
-                    column(2,
-                           downloadButton("download_x", label = "Download density plot")),
-                    column(10,
-                           DT::dataTableOutput("mepvotes"))
-                ),
-                fluidRow(
-                    column(2,
-                           downloadButton("download_y", label = "Download density plot")),
-                    column(10,
-                           DT::dataTableOutput("mepvotes"))
-                ),
-                fluidRow(
-                    column(2,
-                           downloadButton("download_z", label = "Download density plot")),
-                    column(10,
-                           DT::dataTableOutput("mepvotes"))
-                )
+                 )#,
+                # fluidRow(
+                #     column(2,
+                #            downloadButton("download_mep_overview", label = "Download MEP overview")
+                #            ),
+                #     column(10,
+                #            uiOutput("mep_overview"))
+                # ),
+                # fluidRow(
+                #     column(2,
+                #            downloadButton("download_mep_summary", label = "Download MEP summary")),
+                #     column(10,
+                #            DT::dataTableOutput("mep_stats"))
+                # ),
+                # fluidRow(
+                #     column(2,
+                #            downloadButton("download_density_plot", label = "Download density plot")),
+                #     column(10,
+                #            plotOutput("cohesion_density")
+                #            )
+                # )
                 
-    )
+        )
     )
 )
 
